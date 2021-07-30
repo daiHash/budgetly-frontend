@@ -1,42 +1,54 @@
+import { format } from 'date-fns'
 import Head from 'next/head'
-import React, { Fragment, useMemo } from 'react'
+import Link from 'next/link'
+import React, { Fragment, useEffect, useMemo, useRef } from 'react'
 import { useCollection } from 'react-firebase-hooks/firestore'
 import styled from 'styled-components'
-import firebase, { db } from '../utils/firebase'
-
-type Expense = {
-  id: string
-  name: string
-  value: number
-  createdAt: string
-}
+import { db } from '../utils/firebase'
 
 export default function Home() {
-  const [expensesData, expensesLoading, expensesError] = useCollection<
-    Omit<Expense, 'id'>
-  >(db.collection('expenses'), {})
+  const currentDate = useRef(format(new Date(), 'MM-yyyy'))
 
-  const addExpense = async () => {
-    await db.collection('expenses').add({
-      name: 'water bill',
-      value: 7300,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    })
-  }
+  // const [expensesData, expensesLoading, expensesError] = useCollection<
+  //   Omit<Expense, 'id'>
+  // >(
+  //   db
+  //     .collection('expensesGroups')
+  //     .doc(currentDate.current)
+  //     .collection('expenses'),
+  //   {}
+  // )
+  const [expenseGroupData, expenseGroupLoading, expenseGroupError] =
+    useCollection(db.collection('expensesGroups'))
 
-  const onDelete = async (id: string) => {
-    await db.collection('expenses').doc(id).delete()
-  }
+  const [
+    latestExpenseGroupData,
+    latestExpenseGroupLoading,
+    latestExpenseGroupError,
+  ] = useCollection(
+    db.collection('expensesGroups').where('name', '==', currentDate.current)
+  )
 
-  const onUpdate = async (id: string) => {
-    await db.collection('expenses').doc(id).update({ name: 'water bill' })
-  }
+  // const expenses = useMemo<Expense[] | undefined>(() => {
+  //   return expensesData?.docs.map((doc) => {
+  //     return { id: doc.id, ...doc.data() }
+  //   })
+  // }, [expensesData])
 
-  const expenses = useMemo<Expense[] | undefined>(() => {
-    return expensesData?.docs.map((doc) => {
+  const expensesGroups = useMemo(() => {
+    return expenseGroupData?.docs.map((doc) => {
       return { id: doc.id, ...doc.data() }
     })
-  }, [expensesData])
+  }, [expenseGroupData])
+
+  // Add new expensesGroup if doesn't exist. ie: if its a new month
+  useEffect(() => {
+    if (!latestExpenseGroupLoading && !latestExpenseGroupData?.docs[0]) {
+      db.collection('expensesGroups')
+        .doc(currentDate.current)
+        .set({ name: currentDate.current })
+    }
+  }, [latestExpenseGroupData, latestExpenseGroupLoading])
 
   return (
     <Container>
@@ -48,15 +60,15 @@ export default function Home() {
 
       <Main>
         <Title>Budgetly</Title>
-        <button onClick={addExpense}>Add expense</button>
-
         <ul>
-          {expenses &&
-            expenses.map((expense, i) => (
+          {expensesGroups &&
+            expensesGroups.map((expense) => (
               <Fragment key={expense.id}>
-                <li>{expense.name}</li>
-                <button onClick={() => onDelete(expense.id)}>Delete</button>
-                <button onClick={() => onUpdate(expense.id)}>Update</button>
+                <li>
+                  <Link href={`/expenses/detail/${expense.id}`}>
+                    <a>Expenses: {expense.id}</a>
+                  </Link>
+                </li>
               </Fragment>
             ))}
         </ul>
@@ -83,10 +95,17 @@ const Container = styled.div`
 `
 
 const Main = styled.main`
-  padding: 5rem 0;
-  flex: 1;
+  /* padding: 5rem 0;
+  flex: 1; */
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+`
+
+const ExpensesContainer = styled.div`
+  width: 80%;
+  height: 50%;
 `
