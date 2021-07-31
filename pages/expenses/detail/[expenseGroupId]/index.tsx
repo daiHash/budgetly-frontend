@@ -1,12 +1,15 @@
+import Button from '@material-ui/core/Button'
 import { DataGrid, GridColDef } from '@material-ui/data-grid'
+import DeleteIcon from '@material-ui/icons/Delete'
 import Skeleton from '@material-ui/lab/Skeleton'
-import { format } from 'date-fns'
 import { useRouter } from 'next/dist/client/router'
 import Head from 'next/head'
+import Link from 'next/link'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useCollection } from 'react-firebase-hooks/firestore'
 import styled from 'styled-components'
 import { AddExpenseModal } from '../../../../components/Modal/AddExpense'
+import { UpdateExpenseModal } from '../../../../components/Modal/UpdateExpense'
 import { db } from '../../../../utils/firebase'
 
 export type Expense = {
@@ -21,6 +24,10 @@ export default function ExpenseDetail() {
   const router = useRouter()
   const expenseGroupId = useRef(router.query.expenseGroupId as string)
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false)
+  const [showUpdateExpenseModal, setShowUpdateExpenseModal] = useState(false)
+  const [currentExpense, setCurrentExpense] = useState<Expense | undefined>(
+    undefined
+  )
 
   const [expensesData, expensesLoading, expensesError] = useCollection<
     Omit<Expense, 'id'>
@@ -36,17 +43,21 @@ export default function ExpenseDetail() {
   //     db.collection('expensesGroups').where('name', '==', expenseGroupId)
   //   )
 
-  const addExpense = useCallback(async () => {
+  const onDelete = useCallback(async (id: string) => {
     await db
       .collection('expensesGroups')
       .doc(expenseGroupId.current)
       .collection('expenses')
-      .add({
-        name: 'water bill',
-        amount: 7300,
-        type: 'FIXED',
-        createdAt: format(new Date(), 'MM-yyyy'),
-      })
+      .doc(id)
+      .delete()
+  }, [])
+
+  const toggleAddExpenseModal = useCallback(() => {
+    setShowAddExpenseModal((v) => !v)
+  }, [])
+
+  const toggleUpdateExpenseModal = useCallback(() => {
+    setShowUpdateExpenseModal((v) => !v)
   }, [])
 
   const columns: GridColDef[] = [
@@ -75,6 +86,61 @@ export default function ExpenseDetail() {
       width: 150,
       editable: false,
     },
+    {
+      field: '',
+      headerName: 'Update / Delete',
+      editable: false,
+      sortable: false,
+      width: 200,
+      // disableClickEventBubbling: true,
+      renderCell: (params) => {
+        return (
+          <>
+            <Button
+              variant='contained'
+              color='primary'
+              onClick={(e) => {
+                e.stopPropagation()
+                setCurrentExpense(params.row as Expense)
+                toggleUpdateExpenseModal()
+                console.log(params)
+              }}
+              style={{ marginRight: '10px' }}
+            >
+              Update
+            </Button>
+            <Button
+              onClick={() => onDelete(params.id as string)}
+              variant='contained'
+              color='secondary'
+              startIcon={<DeleteIcon />}
+            >
+              Delete
+            </Button>
+          </>
+        ) as React.ReactNode
+      },
+    },
+    // {
+    //   field: '',
+    //   headerName: 'Remove',
+    //   editable: false,
+    //   sortable: false,
+    //   width: 150,
+    //   // disableClickEventBubbling: true,
+    //   renderCell: (params) => {
+    //     return (
+    //       <Button
+    //         onClick={() => onDelete(params.id as string)}
+    //         variant='contained'
+    //         color='secondary'
+    //         startIcon={<DeleteIcon />}
+    //       >
+    //         Delete
+    //       </Button>
+    //     ) as React.ReactNode
+    //   },
+    // },
 
     // {
     //   field: 'fullName',
@@ -89,14 +155,6 @@ export default function ExpenseDetail() {
     // },
   ]
 
-  const onDelete = async (id: string) => {
-    await db.collection('expenses').doc(id).delete()
-  }
-
-  const onUpdate = async (id: string) => {
-    await db.collection('expenses').doc(id).update({ name: 'water bill' })
-  }
-
   const expenses = useMemo<Expense[] | undefined>(() => {
     return expensesData?.docs.map((doc) => {
       return { id: doc.id, ...doc.data() }
@@ -108,10 +166,6 @@ export default function ExpenseDetail() {
   //     return { id: doc.id, ...doc.data() }
   //   })
   // }, [expenseGroupData])
-
-  const toggleAddExpenseModal = useCallback(() => {
-    setShowAddExpenseModal((v) => !v)
-  }, [])
 
   // Add new expensesGroup if doesn't exist. ie: if its a new month
   // useEffect(() => {
@@ -129,10 +183,14 @@ export default function ExpenseDetail() {
         <meta name='description' content='Budgetly' />
         <link rel='icon' href='/favicon.ico' />
       </Head>
-
       <Main>
-        <Title>Budgetly</Title>
-        <button onClick={toggleAddExpenseModal}>Add expense</button>
+        <Link href={`/`}>
+          <a>↞ Go back to Top</a>
+        </Link>
+        <Title>{expenseGroupId.current} Expenses:</Title>
+        <Button color='primary' onClick={toggleAddExpenseModal}>
+          Add Expense
+        </Button>
         <ExpensesContainer>
           {expensesLoading ? (
             <Skeleton variant='rect' width='100%' height='100%'>
@@ -144,7 +202,7 @@ export default function ExpenseDetail() {
                 rows={expenses}
                 columns={columns}
                 pageSize={10}
-                checkboxSelection
+                // checkboxSelection
                 disableSelectionOnClick
               />
             )
@@ -166,39 +224,34 @@ export default function ExpenseDetail() {
         toggleModal={toggleAddExpenseModal}
         currentDate={expenseGroupId.current}
       />
-
-      <footer></footer>
+      {currentExpense && showUpdateExpenseModal && (
+        <UpdateExpenseModal
+          showModal={showUpdateExpenseModal}
+          toggleModal={toggleUpdateExpenseModal}
+          currentDate={expenseGroupId.current}
+          currentExpense={currentExpense}
+        />
+      )}
     </Container>
   )
 }
 
 const Title = styled.h1`
-  font-size: 2rem;
-  color: palevioletred;
+  font-size: 3rem;
 `
 
 const Container = styled.div`
-  min-height: 100vh;
-  padding: 0 0.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  margin: 50px 0;
+  padding: 0 10%;
 `
 
 const Main = styled.main`
-  /* padding: 5rem 0;
-  flex: 1; */
   width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  max-width: 1200px;
+  height: calc(100vh - 164px);
 `
 
 const ExpensesContainer = styled.div`
-  width: 80%;
-  height: 50%;
+  width: 100%;
+  height: 60%;
 `

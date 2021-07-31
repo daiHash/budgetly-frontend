@@ -6,7 +6,7 @@ import DialogContent from '@material-ui/core/DialogContent'
 // import DialogContentText from '@material-ui/core/DialogContentText'
 import DialogTitle from '@material-ui/core/DialogTitle'
 import TextField from '@material-ui/core/TextField'
-import { format } from 'date-fns'
+import isEqual from 'lodash.isequal'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Expense } from '../../../pages/expenses/detail/[expenseGroupId]'
 import { db } from '../../../utils/firebase'
@@ -16,6 +16,7 @@ type Props = {
   toggleModal: () => void
   // addExpense: () => void
   currentDate: string
+  currentExpense: Expense
 }
 
 export const expenseTypes = {
@@ -28,32 +29,30 @@ export const expenseTypes = {
 
 export const expenseTypesData = Object.keys(expenseTypes)
 
-const initialValue: Omit<Expense, 'id'> = {
-  name: '',
-  type: '',
-  amount: 0,
-  createdAt: '',
-}
-
-export const AddExpenseModal: React.FC<Props> = ({
+export const UpdateExpenseModal: React.FC<Props> = ({
   showModal,
   toggleModal,
   currentDate,
+  currentExpense,
 }) => {
-  const [expense, setExpense] = useState<Omit<Expense, 'id'>>(initialValue)
+  const initialValue = {
+    name: currentExpense.name,
+    type: currentExpense.type,
+    amount: currentExpense.amount,
+  }
 
-  const addExpense = useCallback(async () => {
+  const [expense, setExpense] =
+    useState<Omit<Expense, 'id' | 'createdAt'>>(initialValue)
+
+  const updateExpense = useCallback(async () => {
     await db
       .collection('expensesGroups')
       .doc(currentDate)
       .collection('expenses')
-      .add({
-        ...expense,
-        amount: Number(expense.amount),
-        createdAt: format(new Date(), 'yyyy-MM-dd'),
-      })
+      .doc(currentExpense.id)
+      .update(expense)
     toggleModal()
-  }, [expense])
+  }, [currentExpense, expense])
 
   const onInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
@@ -74,7 +73,7 @@ export const AddExpenseModal: React.FC<Props> = ({
   )
 
   const disableButton = useMemo(() => {
-    return !expense.name || !expense.amount || !expense.type
+    return isEqual(initialValue, expense)
   }, [expense])
 
   useEffect(() => {
@@ -89,7 +88,7 @@ export const AddExpenseModal: React.FC<Props> = ({
       aria-labelledby='form-dialog-title'
     >
       <div>
-        <DialogTitle id='form-dialog-title'>Add new expense</DialogTitle>
+        <DialogTitle id='form-dialog-title'>Update expense</DialogTitle>
         <DialogContent>
           {/* <DialogContentText>
             To subscribe to this website, please enter your email address here.
@@ -139,11 +138,13 @@ export const AddExpenseModal: React.FC<Props> = ({
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={toggleModal} color='primary'>
-            Cancel
-          </Button>
-          <Button onClick={addExpense} color='primary' disabled={disableButton}>
-            Add Expense
+          <Button onClick={toggleModal}>Cancel</Button>
+          <Button
+            onClick={updateExpense}
+            color='primary'
+            disabled={disableButton}
+          >
+            Update Expense
           </Button>
         </DialogActions>
       </div>
