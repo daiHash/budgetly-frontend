@@ -5,7 +5,7 @@ import Skeleton from '@material-ui/lab/Skeleton'
 import { useRouter } from 'next/dist/client/router'
 import Head from 'next/head'
 import Link from 'next/link'
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { useCollection } from 'react-firebase-hooks/firestore'
 import styled from 'styled-components'
 import { AddExpenseModal } from '../../../../components/Modal/AddExpense'
@@ -22,7 +22,10 @@ export type Expense = {
 
 export default function ExpenseDetail() {
   const router = useRouter()
-  const expenseGroupId = useRef(router.query.expenseGroupId as string)
+  const expenseGroupId = useMemo(
+    () => router.query.expenseGroupId as string,
+    [router.query.expenseGroupId]
+  )
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false)
   const [showUpdateExpenseModal, setShowUpdateExpenseModal] = useState(false)
   const [currentExpense, setCurrentExpense] = useState<Expense | undefined>(
@@ -32,10 +35,7 @@ export default function ExpenseDetail() {
   const [expensesData, expensesLoading, expensesError] = useCollection<
     Omit<Expense, 'id'>
   >(
-    db
-      .collection('expensesGroups')
-      .doc(expenseGroupId.current)
-      .collection('expenses'),
+    db.collection('expensesGroups').doc(expenseGroupId).collection('expenses'),
     {}
   )
   // const [expenseGroupData, expenseGroupLoading, expenseGroupError] =
@@ -46,7 +46,7 @@ export default function ExpenseDetail() {
   const onDelete = useCallback(async (id: string) => {
     await db
       .collection('expensesGroups')
-      .doc(expenseGroupId.current)
+      .doc(expenseGroupId)
       .collection('expenses')
       .doc(id)
       .delete()
@@ -103,7 +103,6 @@ export default function ExpenseDetail() {
                 e.stopPropagation()
                 setCurrentExpense(params.row as Expense)
                 toggleUpdateExpenseModal()
-                console.log(params)
               }}
               style={{ marginRight: '10px' }}
             >
@@ -121,27 +120,6 @@ export default function ExpenseDetail() {
         ) as React.ReactNode
       },
     },
-    // {
-    //   field: '',
-    //   headerName: 'Remove',
-    //   editable: false,
-    //   sortable: false,
-    //   width: 150,
-    //   // disableClickEventBubbling: true,
-    //   renderCell: (params) => {
-    //     return (
-    //       <Button
-    //         onClick={() => onDelete(params.id as string)}
-    //         variant='contained'
-    //         color='secondary'
-    //         startIcon={<DeleteIcon />}
-    //       >
-    //         Delete
-    //       </Button>
-    //     ) as React.ReactNode
-    //   },
-    // },
-
     // {
     //   field: 'fullName',
     //   headerName: 'Full name',
@@ -161,21 +139,6 @@ export default function ExpenseDetail() {
     })
   }, [expensesData])
 
-  // const expensesGroups = useMemo(() => {
-  //   return expenseGroupData?.docs.map((doc) => {
-  //     return { id: doc.id, ...doc.data() }
-  //   })
-  // }, [expenseGroupData])
-
-  // Add new expensesGroup if doesn't exist. ie: if its a new month
-  // useEffect(() => {
-  //   if (!expenseGroupLoading && !expenseGroupData?.docs[0]) {
-  //     db.collection('expensesGroups')
-  //       .doc(expenseGroupId.current)
-  //       .set({ name: expenseGroupId.current })
-  //   }
-  // }, [expenseGroupData, expenseGroupLoading])
-
   return (
     <Container>
       <Head>
@@ -187,7 +150,7 @@ export default function ExpenseDetail() {
         <Link href={`/`}>
           <a>↞ Go back to Top</a>
         </Link>
-        <Title>{expenseGroupId.current} Expenses:</Title>
+        <Title>{expenseGroupId} Expenses:</Title>
         <Button color='primary' onClick={toggleAddExpenseModal}>
           Add Expense
         </Button>
@@ -208,27 +171,17 @@ export default function ExpenseDetail() {
             )
           )}
         </ExpensesContainer>
-        {/* <ul>
-          {expenses &&
-            expenses.map((expense, i) => (
-              <Fragment key={expense.id}>
-                <li>{expense.name}</li>
-                <button onClick={() => onDelete(expense.id)}>Delete</button>
-                <button onClick={() => onUpdate(expense.id)}>Update</button>
-              </Fragment>
-            ))}
-        </ul> */}
       </Main>
       <AddExpenseModal
         showModal={showAddExpenseModal}
         toggleModal={toggleAddExpenseModal}
-        currentDate={expenseGroupId.current}
+        currentDate={expenseGroupId}
       />
       {currentExpense && showUpdateExpenseModal && (
         <UpdateExpenseModal
           showModal={showUpdateExpenseModal}
           toggleModal={toggleUpdateExpenseModal}
-          currentDate={expenseGroupId.current}
+          currentDate={expenseGroupId}
           currentExpense={currentExpense}
         />
       )}
